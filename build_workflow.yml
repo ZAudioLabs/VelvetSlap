@@ -1,0 +1,26 @@
+name: Build Velvet Slap
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VelvetSlap-${{ matrix.os }}
+          if-no-files-found: warn
+          path: |
+            build/VelvetSlap_artefacts/Release/VST3
+            build/VelvetSlap_artefacts/Release/AU
+            build/VelvetSlap_artefacts/VST3
+            build/VelvetSlap_artefacts/AU
