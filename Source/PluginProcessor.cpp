@@ -9,7 +9,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout VelvetSlapAudioProcessor::la
     l.add (std::make_unique<APF> ("mix",      "Mix",      juce::NormalisableRange<float> (0.f, 1.f),  0.30f));
     l.add (std::make_unique<APF> ("ambience", "Ambience", juce::NormalisableRange<float> (0.f, 1.f),  0.35f));
     l.add (std::make_unique<APF> ("width",    "Width",    juce::NormalisableRange<float> (0.f, 1.5f), 1.0f));
-    l.add (std::make_unique<APF> ("delay",    "Delay",    juce::NormalisableRange<float> (0.f, 1.f),  0.30f));
+    l.add (std::make_unique<APF> ("delay", "Delay", juce::NormalisableRange<float> (20.f, 180.f), 70.f,
+                                  juce::AudioParameterFloatAttributes().withLabel ("ms")));
     l.add (std::make_unique<APF> ("sccomp",   "S.C. Comp",juce::NormalisableRange<float> (0.f, 1.f),  0.30f));
     l.add (std::make_unique<juce::AudioParameterBool> ("wetonly", "Wet Only", false));
     l.add (std::make_unique<juce::AudioParameterBool> ("bypass",  "Bypass",   false));
@@ -54,7 +55,7 @@ void VelvetSlapAudioProcessor::processBlock (juce::AudioBuffer<float>& buf, juce
 
     wet.setSize (2, n, false, false, true);
     duck.resize ((size_t) n);
-    sDelay.setTargetValue ((float) (sr * (0.020 + 0.160 * del)));   // 20 a 180 ms
+    sDelay.setTargetValue ((float) (sr * 0.001 * del));   // del ja esta em ms (20 a 180)
 
     auto *L = buf.getWritePointer (0), *R = buf.getWritePointer (1);
     auto *wl = wet.getWritePointer (0), *wr = wet.getWritePointer (1);
@@ -78,6 +79,7 @@ void VelvetSlapAudioProcessor::processBlock (juce::AudioBuffer<float>& buf, juce
     juce::dsp::AudioBlock<float> blk (rev);
     reverb.process (juce::dsp::ProcessContextReplacing<float> (blk));
     auto *rl = rev.getReadPointer (0), *rr = rev.getReadPointer (1);
+    const float dryG = juce::jmin (1.f, 2.f * (1.f - mix));   // dry fica em 100% ate Mix 50%, sem queda de volume
 
     for (int i = 0; i < n; ++i)
     {
@@ -86,8 +88,8 @@ void VelvetSlapAudioProcessor::processBlock (juce::AudioBuffer<float>& buf, juce
         float r = (wr[i] * (1.f - 0.3f * amb) + rr[i] * amb) * g;
         const float m = 0.5f * (l + r), s = 0.5f * (l - r) * wid;    // width 0-150%
         l = m + s; r = m - s;
-        L[i] = wetOnly ? l * mix : L[i] * (1.f - mix) + l * mix;
-        R[i] = wetOnly ? r * mix : R[i] * (1.f - mix) + r * mix;
+        L[i] = wetOnly ? l * mix : L[i] * dryG + l * mix;
+        R[i] = wetOnly ? r * mix : R[i] * dryG + r * mix;
     }
 }
 

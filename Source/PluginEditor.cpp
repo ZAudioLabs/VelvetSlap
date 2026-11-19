@@ -45,12 +45,7 @@ void PillButton::paintButton (juce::Graphics& g, bool, bool)
     g.drawRoundedRectangle (b, 8.f, on ? 3.f : 2.f);
     g.setColour (juce::Colours::white.withAlpha (0.92f));
     g.setFont (juce::FontOptions (b.getHeight() * 0.38f, juce::Font::bold));
-    g.drawText (label, b.reduced (6.f, 0.f), showV && on ? juce::Justification::centredLeft : juce::Justification::centred);
-    if (showV && on)
-    {
-        g.setColour (lime);
-        g.drawText ("V", b.reduced (10.f, 0.f), juce::Justification::centredRight);
-    }
+    g.drawText (label, b.reduced (6.f, 0.f), juce::Justification::centred);
 }
 
 VelvetSlapEditor::VelvetSlapEditor (VelvetSlapAudioProcessor& p) : AudioProcessorEditor (&p)
@@ -64,10 +59,11 @@ VelvetSlapEditor::VelvetSlapEditor (VelvetSlapAudioProcessor& p) : AudioProcesso
         knobs[i].setRotaryParameters (juce::MathConstants<float>::pi * 1.25f,
                                       juce::MathConstants<float>::pi * 2.75f, true);
         knobs[i].setLookAndFeel (&lnf);
+        knobs[i].onValueChange = [this] { repaint(); };
         addAndMakeVisible (knobs[i]);
         ka[i] = std::make_unique<SA> (p.apvts, ids[i], knobs[i]);
     }
-    wetBtn.label = "Wet Only"; bypBtn.label = "Bypass"; bypBtn.showV = true;
+    wetBtn.label = "Wet Only"; bypBtn.label = "Bypass";
     addAndMakeVisible (wetBtn); addAndMakeVisible (bypBtn);
     wa = std::make_unique<BA> (p.apvts, "wetonly", wetBtn);
     ba = std::make_unique<BA> (p.apvts, "bypass", bypBtn);
@@ -78,10 +74,56 @@ VelvetSlapEditor::VelvetSlapEditor (VelvetSlapAudioProcessor& p) : AudioProcesso
     setSize (836, 470);
 }
 
+static juce::Colour sampleColour (const juce::Image& im, juce::Rectangle<int> r)
+{
+    const int pts[3][2] = { { r.getX() - 6, r.getCentreY() }, { r.getRight() + 6, r.getCentreY() }, { r.getCentreX(), r.getBottom() + 6 } };
+    float rr = 0, gg = 0, bb = 0;
+    for (auto& p : pts)
+    {
+        auto c = im.getPixelAt (juce::jlimit (0, im.getWidth() - 1, p[0]), juce::jlimit (0, im.getHeight() - 1, p[1]));
+        rr += c.getFloatRed(); gg += c.getFloatGreen(); bb += c.getFloatBlue();
+    }
+    return juce::Colour::fromFloatRGBA (rr / 3.f, gg / 3.f, bb / 3.f, 1.f);
+}
+
+juce::String VelvetSlapEditor::readout (int i) const
+{
+    const auto v = (float) knobs[i].getValue();
+    if (i == 3) return juce::String (juce::roundToInt (v)) + " ms";
+    return juce::String (juce::roundToInt (v * 100.f)) + " %";
+}
+
 void VelvetSlapEditor::paint (juce::Graphics& g)
 {
     g.fillAll (juce::Colours::black);
     g.drawImage (bg, getLocalBounds().toFloat());
+    const float s = getWidth() / 1672.f, k = bg.getWidth() / 1672.f;
+    const float cx[5] = { 210.f, 525.f, 833.f, 1143.f, 1453.f };
+
+    // troca os rotulos "0%" e "100%" do Delay por ms
+    const juce::Rectangle<float> pl (cx[3] - 125.f, 588.f, 62.f, 36.f), pr (cx[3] + 52.f, 588.f, 82.f, 36.f);
+    for (auto r : { pl, pr })
+    {
+        g.setColour (sampleColour (bg, { (int) (r.getX() * k), (int) (r.getY() * k), (int) (r.getWidth() * k), (int) (r.getHeight() * k) }));
+        g.fillRoundedRectangle (r * s, 6.f * s);
+    }
+    g.setColour (juce::Colour (0xffe0e0e0));
+    g.setFont (juce::FontOptions (25.f * s, juce::Font::bold));
+    g.drawText ("20 ms",  (pl.withTrimmedLeft (12.f) * s), juce::Justification::centredLeft);
+    g.drawText ("180 ms", (pr.withTrimmedRight (8.f) * s), juce::Justification::centredRight);
+
+    // valor atual de cada knob
+    for (int i = 0; i < 5; ++i)
+    {
+        auto r = juce::Rectangle<float> (96.f, 32.f).withCentre ({ cx[i], 604.f }) * s;
+        g.setColour (juce::Colour (0xd90c0d08));
+        g.fillRoundedRectangle (r, 8.f * s);
+        g.setColour (lime.withAlpha (0.55f));
+        g.drawRoundedRectangle (r, 8.f * s, 1.5f);
+        g.setColour (lime);
+        g.setFont (juce::FontOptions (24.f * s, juce::Font::bold));
+        g.drawText (readout (i), r, juce::Justification::centred);
+    }
 }
 
 void VelvetSlapEditor::resized()

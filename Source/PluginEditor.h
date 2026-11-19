@@ -11,7 +11,7 @@ struct VelvetLnF : juce::LookAndFeel_V4
 // Botao com visual do layout (borda verde neon quando ativo)
 struct PillButton : juce::ToggleButton
 {
-    juce::String label; bool showV = false;
+    juce::String label;
     void paintButton (juce::Graphics&, bool, bool) override;
 };
 
@@ -22,6 +22,7 @@ public:
     ~VelvetSlapEditor() override { for (auto& k : knobs) k.setLookAndFeel (nullptr); }
     void paint (juce::Graphics&) override;
     void resized() override;
+    juce::String readout (int i) const;
 private:
     using SA = juce::AudioProcessorValueTreeState::SliderAttachment;
     using BA = juce::AudioProcessorValueTreeState::ButtonAttachment;
